@@ -1,0 +1,7 @@
+{
+    "Food": ["starbucks", "mcdonald", "kfc", "burger king"],
+    "Transport": ["uber", "lyft", "metro", "bus", "cab"],
+    "Shopping": ["amazon", "ebay", "walmart"],
+    "Bills": ["verizon", "at&t", "comcast"],
+    "Entertainment": ["netflix", "spotify", "youtube"]
+  }

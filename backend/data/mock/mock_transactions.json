@@ -1,0 +1,26 @@
+[
+    {
+      "id": "txn1",
+      "amount": 20.5,
+      "category": "",
+      "merchant": "Starbucks",
+      "date": "2025-04-01",
+      "description": "Coffee and snack"
+    },
+    {
+      "id": "txn2",
+      "amount": 55.0,
+      "category": "",
+      "merchant": "Uber",
+      "date": "2025-04-02",
+      "description": "Cab ride"
+    },
+    {
+      "id": "txn3",
+      "amount": 120.75,
+      "category": "",
+      "merchant": "Amazon",
+      "date": "2025-04-03",
+      "description": "Online shopping"
+    }
+  ]
