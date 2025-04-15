@@ -363,6 +363,44 @@ app.put('/profile/:userId', async (req, res) => {
   }
 });
 
+// Create a new user (signup) endpoint.
+app.post('/signup', async (req, res) => {
+    const { email, password, displayName } = req.body;
+    if (!email || !password) {
+      return res.status(400).send("Email and password are required.");
+    }
+  
+    try {
+      // Create the user in Firebase Auth
+      const userRecord = await admin.auth().createUser({
+        email,
+        password,
+        displayName: displayName || ''
+      });
+      
+      // Create a user profile document in Firestore
+      const userProfile = {
+        displayName: displayName || '',
+        email: email,
+        settings: {
+          darkMode: false,
+          currency: 'USD',
+          language: 'en'
+        }
+        // Add other fields as needed.
+      };
+  
+      // Save the profile document under the Users collection using the UID.
+      await db.collection('Users').doc(userRecord.uid).set(userProfile);
+  
+      res.json({ uid: userRecord.uid, message: "User created successfully." });
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(500).send(error.toString());
+    }
+  });
+  
+
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
