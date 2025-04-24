@@ -1,9 +1,4 @@
 import 'package:flutter/material.dart';
-import 'expenses_screen.dart';
-// import 'budgets_screen.dart';
-// import 'savings_screen.dart';
-// import 'insights_screen.dart';
-// import 'profile_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Function(bool) onThemeChange;
@@ -15,18 +10,23 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _currentIndex = 0;
-  final List<Widget> _screens = [];
 
-  @override
-  void initState() {
-    super.initState();
-    _screens.addAll([
-      ExpensesScreen(),
-      // BudgetsScreen(),
-      // SavingsScreen(),
-      // InsightsScreen(),
-      // ProfileScreen(onThemeChange: widget.onThemeChange),
-    ]);
+  // Temporary placeholder screens
+  Widget _buildPlaceholderScreen(String title) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.construction, size: 64),
+          SizedBox(height: 16),
+          Text(
+            '$title Screen\nComing Soon',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 24),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -35,18 +35,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
       appBar: AppBar(
         title: Text('BalanciFi Dashboard'),
       ),
-      body: _screens[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [
+          _buildPlaceholderScreen('Expenses'),
+          _buildPlaceholderScreen('Budgets'),
+          _buildPlaceholderScreen('Savings'),
+          _buildPlaceholderScreen('Insights'),
+          _buildPlaceholderScreen('Profile'),
+        ],
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
+        type: BottomNavigationBarType
+            .fixed, // This is needed for more than 3 items
         items: [
           BottomNavigationBarItem(icon: Icon(Icons.money), label: 'Expenses'),
-          BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label: 'Budgets'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.account_balance_wallet), label: 'Budgets'),
           BottomNavigationBarItem(icon: Icon(Icons.savings), label: 'Savings'),
-          BottomNavigationBarItem(icon: Icon(Icons.insights), label: 'Insights'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.insights), label: 'Insights'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
         onTap: (int index) {
-          setState(() { _currentIndex = index; });
+          setState(() {
+            _currentIndex = index;
+          });
         },
       ),
     );

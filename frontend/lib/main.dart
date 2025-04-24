@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'screens/splash_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'theme/app_theme.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+void main() {
   runApp(BalanciFiApp());
 }
 
@@ -16,25 +17,44 @@ class BalanciFiApp extends StatefulWidget {
 }
 
 class _BalanciFiAppState extends State<BalanciFiApp> {
-  bool darkMode = false; // User setting for dark mode
+  bool _showSplash = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // Simulate splash screen delay
+    Future.delayed(Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          _showSplash = false;
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'BalanciFi',
-      theme: darkMode ? ThemeData.dark() : ThemeData.light(),
-      home: AuthWrapper(onThemeChange: (bool value) {
-        setState(() {
-          darkMode = value;
-        });
-      }),
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      home: Builder(
+        builder: (context) {
+          if (_showSplash) {
+            return SplashScreen();
+          }
+          return OnboardingScreen();
+        },
+      ),
       routes: {
-        '/login': (_) => LoginScreen(),
-        '/dashboard': (_) => DashboardScreen(onThemeChange: (bool value) {
-          setState(() {
-            darkMode = value;
-          });
-        }),
+        '/login': (context) => LoginScreen(),
+        '/dashboard': (context) => DashboardScreen(
+              onThemeChange: (bool value) {
+                setState(() {
+                  // Handle theme change
+                });
+              },
+            ),
       },
     );
   }
@@ -50,7 +70,9 @@ class AuthWrapper extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.active) {
-          return snapshot.data == null ? LoginScreen() : DashboardScreen(onThemeChange: onThemeChange);
+          return snapshot.data == null
+              ? LoginScreen()
+              : DashboardScreen(onThemeChange: onThemeChange);
         }
         return Center(child: CircularProgressIndicator());
       },
