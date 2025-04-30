@@ -7,7 +7,19 @@ import 'screens/dashboard_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'theme/app_theme.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: FirebaseOptions(
+      apiKey: 'AIzaSyBYu6J4haL7KulB7FX3DaBPRoD-8RmBO0o',
+      authDomain: 'balancifi-457623.firebaseapp.com',
+      projectId: 'balancifi-457623',
+      storageBucket: 'balancifi-457623.firebasestorage.app',
+      messagingSenderId: '655962644721',
+      appId: '1:655962644721:web:cb993148b33f84de968950',
+      measurementId: 'G-0YQB6X7VHW',
+    ),
+  );
   runApp(BalanciFiApp());
 }
 

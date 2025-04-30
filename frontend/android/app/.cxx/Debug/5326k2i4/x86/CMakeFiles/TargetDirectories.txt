@@ -1,0 +1,2 @@
+C:/Users/tshah/OneDrive - California State University Chico/Desktop/CourseWork/CINS467/BalanciFi/frontend/android/app/.cxx/Debug/5326k2i4/x86/CMakeFiles/edit_cache.dir
+C:/Users/tshah/OneDrive - California State University Chico/Desktop/CourseWork/CINS467/BalanciFi/frontend/android/app/.cxx/Debug/5326k2i4/x86/CMakeFiles/rebuild_cache.dir
