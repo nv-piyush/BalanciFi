@@ -2,6 +2,13 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
 class OnboardingScreen extends StatefulWidget {
+  final VoidCallback onComplete;
+
+  const OnboardingScreen({
+    Key? key,
+    required this.onComplete,
+  }) : super(key: key);
+
   @override
   _OnboardingScreenState createState() => _OnboardingScreenState();
 }
@@ -24,7 +31,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     OnboardingPage(
       title: 'Set goals\nWin rewards',
       description: 'Achieve your financial goals and earn rewards',
-      buttonText: 'Continue',
+      buttonText: 'Get Started',
     ),
   ];
 
@@ -35,8 +42,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         curve: Curves.easeIn,
       );
     } else {
-      // On last page, navigate to login
-      Navigator.pushReplacementNamed(context, '/login');
+      // On last page, call onComplete callback
+      widget.onComplete();
     }
   }
 
@@ -78,7 +85,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: _currentPage == index
-                          ? AppTheme.primaryColor
+                          ? Color(0xFF1B4242)
                           : Colors.grey[300],
                     ),
                   ),
@@ -124,20 +131,38 @@ class OnboardingPageWidget extends StatelessWidget {
           Text(
             page.title,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineLarge,
+            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                  color: Color(0xFF1B4242),
+                  fontWeight: FontWeight.bold,
+                ),
           ),
           SizedBox(height: 16),
           // Description
           Text(
             page.description,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyLarge,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Colors.grey[600],
+                ),
           ),
           SizedBox(height: 32),
           // Button
           ElevatedButton(
             onPressed: onButtonPressed,
-            child: Text(page.buttonText),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFF1B4242),
+              padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              page.buttonText,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
