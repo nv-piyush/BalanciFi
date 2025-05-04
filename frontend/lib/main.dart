@@ -21,7 +21,7 @@ void main() async {
             apiKey: "AIzaSyBYu6J4haL7KulB7FX3DaBPRoD-8RmBO0o",
             authDomain: "balancifi-457623.firebaseapp.com",
             projectId: "balancifi-457623",
-            storageBucket: "balancifi-457623.firebasestorage.app",
+            storageBucket: "balancifi-457623.appspot.com",
             messagingSenderId: "655962644721",
             appId: "1:655962644721:web:cb993148b33f84de968950",
             measurementId: "G-0YQB6X7VHW"),
@@ -30,8 +30,22 @@ void main() async {
       await Firebase.initializeApp();
     }
     print('Firebase initialized successfully');
+
+    // Initialize Firestore database
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final expensesRef = firestore.collection('expenses');
+
+      // Just check if we can access the collection
+      await expensesRef.limit(1).get();
+      print('Successfully connected to Firestore');
+    } catch (e) {
+      print('Warning: Could not initialize Firestore: $e');
+      // Continue app execution even if Firestore initialization fails
+    }
   } catch (e) {
     print('Error initializing Firebase: $e');
+    // Continue app execution even if Firebase initialization fails
   }
 
   runApp(const MyApp());

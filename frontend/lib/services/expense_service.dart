@@ -10,40 +10,40 @@ class ExpenseService {
     final user = _auth.currentUser;
     if (user != null) {
       return _firestore
+          .collection('users')
+          .doc(user.uid)
           .collection('expenses')
-          .where('userId', isEqualTo: user.uid)
           .orderBy('date', descending: true)
           .snapshots();
     }
     throw Exception('No user logged in');
   }
 
-  // Add new expense with automatic categorization
+  // Add new expense
   Future<void> addExpense({
+    required String title,
     required double amount,
-    required String description,
-    required DateTime date,
-    String? category,
-    String? receiptUrl,
+    required String category,
   }) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('User not logged in');
 
-    // AI-based categorization logic will be implemented here
-    final autoCategory = category ?? await _categorizeExpense(description);
-
-    await _firestore
-        .collection('users')
-        .doc(user.uid)
-        .collection('expenses')
-        .add({
-      'amount': amount,
-      'description': description,
-      'date': date,
-      'category': autoCategory,
-      'receiptUrl': receiptUrl,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('expenses')
+          .add({
+        'title': title,
+        'amount': amount,
+        'category': category,
+        'date': DateTime.now(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('Error adding expense: $e');
+      throw Exception('Failed to add expense: $e');
+    }
   }
 
   // Get expenses with optional filtering
@@ -118,10 +118,18 @@ class ExpenseService {
   // Delete expense
   Future<void> deleteExpense(String expenseId) async {
     final user = _auth.currentUser;
-    if (user != null) {
-      await _firestore.collection('expenses').doc(expenseId).delete();
-    } else {
-      throw Exception('No user logged in');
+    if (user == null) throw Exception('No user logged in');
+
+    try {
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('expenses')
+          .doc(expenseId)
+          .delete();
+    } catch (e) {
+      print('Error deleting expense: $e');
+      throw Exception('Failed to delete expense: $e');
     }
   }
 
@@ -133,15 +141,23 @@ class ExpenseService {
     required String category,
   }) async {
     final user = _auth.currentUser;
-    if (user != null) {
-      await _firestore.collection('expenses').doc(expenseId).update({
+    if (user == null) throw Exception('No user logged in');
+
+    try {
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('expenses')
+          .doc(expenseId)
+          .update({
         'title': title,
         'amount': amount,
         'category': category,
-        'updatedAt': Timestamp.now(),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
-    } else {
-      throw Exception('No user logged in');
+    } catch (e) {
+      print('Error updating expense: $e');
+      throw Exception('Failed to update expense: $e');
     }
   }
 }

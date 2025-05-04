@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AddExpenseScreen extends StatefulWidget {
   @override
@@ -49,24 +51,79 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) throw Exception('User not logged in');
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
 
-      await FirebaseFirestore.instance.collection('expenses').add({
-        'userId': user.uid,
+      print('Current user: ${user.uid}');
+      print('User email: ${user.email}');
+
+      // Get Firestore instance
+      final firestore = FirebaseFirestore.instance;
+
+      // Store expense in user's expenses subcollection
+      final userExpensesRef =
+          firestore.collection('users').doc(user.uid).collection('expenses');
+
+      // Create the expense data
+      final now = kIsWeb ? Timestamp.now() : FieldValue.serverTimestamp();
+
+      final expenseData = {
         'title': _titleController.text,
         'amount': double.parse(_amountController.text),
         'category': _selectedCategory,
-        'date': DateTime.now(),
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+        'date': now,
+        'createdAt': now,
+      };
 
+      print('About to add expense: $expenseData');
+      final docRef = await userExpensesRef.add(expenseData);
+      print('Expense added, docRef: ${docRef.id}');
+
+      // Verify the document was created
+      final docSnapshot = await docRef.get();
+      if (!docSnapshot.exists) {
+        throw Exception('Failed to create expense document');
+      }
+
+      print('Expense saved with ID: ${docRef.id}');
       Navigator.pop(context);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving expense: $e')),
-      );
+      print('Error in _saveExpense: $e');
+      if (e is FirebaseException) {
+        print('Firebase error code: ${e.code}');
+        print('Firebase error message: ${e.message}');
+        print('Firebase error details: ${e.toString()}');
+
+        // Handle specific Firebase errors
+        String errorMessage = 'Error saving expense';
+        if (e.code == 'permission-denied') {
+          errorMessage =
+              'Permission denied. Please check your authentication status.';
+        } else if (e.code == 'not-found') {
+          errorMessage = 'Database not found. Please contact support.';
+        } else if (e.code == 'unavailable') {
+          errorMessage = 'Service unavailable. Please try again later.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving expense: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
