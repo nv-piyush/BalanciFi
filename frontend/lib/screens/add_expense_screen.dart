@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import '../services/budget_service.dart';
 
 class AddExpenseScreen extends StatefulWidget {
   @override
@@ -11,7 +13,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _amountController = TextEditingController();
-  String _selectedCategory = 'Shopping';
+  final _descriptionController = TextEditingController();
+  String _selectedCategory = 'Food';
+  DateTime _selectedDate = DateTime.now();
+  final _budgetService = BudgetService();
+  late ScaffoldMessengerState _scaffoldMessenger;
   bool _isLoading = false;
 
   final List<Map<String, dynamic>> categories = [
@@ -42,31 +48,63 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     },
   ];
 
-  Future<void> _saveExpense() async {
-    if (!_formKey.currentState!.validate()) return;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _scaffoldMessenger = ScaffoldMessenger.of(context);
+  }
 
-    setState(() => _isLoading = true);
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _amountController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
 
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) throw Exception('User not logged in');
+  Future<void> _addExpense() async {
+    if (_formKey.currentState!.validate()) {
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) throw Exception('User not logged in');
 
-      await FirebaseFirestore.instance.collection('expenses').add({
-        'userId': user.uid,
-        'title': _titleController.text,
-        'amount': double.parse(_amountController.text),
-        'category': _selectedCategory,
-        'date': DateTime.now(),
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+        final expenseData = {
+          'title': _titleController.text,
+          'amount': double.parse(_amountController.text),
+          'category': _selectedCategory,
+          'description': _descriptionController.text,
+          'date': _selectedDate,
+          'createdAt': FieldValue.serverTimestamp(),
+        };
 
-      Navigator.pop(context);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving expense: $e')),
-      );
-    } finally {
-      setState(() => _isLoading = false);
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('expenses')
+            .add(expenseData);
+
+        // Sync budgets with expenses to ensure accurate spent amounts
+        await _budgetService.syncBudgetWithExpenses();
+
+        if (mounted) {
+          _scaffoldMessenger.showSnackBar(
+            SnackBar(
+              content: Text('Expense added successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pop(context);
+        }
+      } catch (e) {
+        if (mounted) {
+          _scaffoldMessenger.showSnackBar(
+            SnackBar(
+              content: Text('Error adding expense: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -190,7 +228,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         child: Padding(
           padding: EdgeInsets.all(16),
           child: ElevatedButton(
-            onPressed: _isLoading ? null : _saveExpense,
+            onPressed: _isLoading ? null : _addExpense,
             style: ElevatedButton.styleFrom(
               backgroundColor: Color(0xFF1B4242),
               padding: EdgeInsets.symmetric(vertical: 16),
@@ -218,12 +256,5 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _amountController.dispose();
-    super.dispose();
   }
 }

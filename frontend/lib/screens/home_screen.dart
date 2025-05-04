@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 import 'budget_screen.dart';
 import 'savings_screen.dart';
 import 'insights_screen.dart';
 import 'profile_screen.dart';
 import 'add_expense_screen.dart';
+import '../services/budget_service.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -14,60 +16,124 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final user = FirebaseAuth.instance.currentUser;
+  final _budgetService = BudgetService();
   DateTime selectedDate = DateTime.now();
   String searchQuery = '';
   List<Transaction> transactions = [];
   bool isLoading = true;
   String? error;
+  StreamSubscription<QuerySnapshot>? _expensesSubscription;
+  late ScaffoldMessengerState _scaffoldMessenger;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _scaffoldMessenger = ScaffoldMessenger.of(context);
+  }
 
   @override
   void initState() {
     super.initState();
-    _loadTransactions();
+    _setupExpensesListener();
+    _syncBudgetsWithExpenses();
   }
 
-  Future<void> _loadTransactions() async {
-    try {
+  void _setupExpensesListener() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
       setState(() {
-        isLoading = true;
-        error = null;
+        error = 'User not logged in';
+        isLoading = false;
       });
+      return;
+    }
 
-      // Placeholder data for now
-      setState(() {
-        transactions = [
-          Transaction(
-            title: 'Shopping',
-            amount: 54.99,
-            date: DateTime.now(),
-            category: 'shopping',
-            icon: Icons.shopping_bag,
-            color: Colors.amber,
-          ),
-          Transaction(
-            title: 'Food Delivery',
-            amount: 24.50,
-            date: DateTime.now().subtract(Duration(days: 1)),
-            category: 'food',
-            icon: Icons.delivery_dining,
-            color: Colors.red,
-          ),
-          Transaction(
-            title: 'Monthly Reward',
-            amount: 15.00,
-            date: DateTime.now().subtract(Duration(days: 2)),
-            category: 'reward',
-            icon: Icons.card_giftcard,
-            color: Colors.green,
-          ),
-        ];
-        isLoading = false;
-      });
+    _expensesSubscription = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('expenses')
+        .orderBy('date', descending: true)
+        .snapshots()
+        .listen(
+      (snapshot) {
+        if (!mounted) return;
+        setState(() {
+          transactions = snapshot.docs.map((doc) {
+            final data = doc.data();
+            return Transaction(
+              title: data['title'] ?? '',
+              amount: (data['amount'] ?? 0.0).toDouble(),
+              date: (data['date'] as Timestamp).toDate(),
+              category: data['category'] ?? 'other',
+              icon: _getCategoryIcon(data['category'] ?? 'other'),
+              color: _getCategoryColor(data['category'] ?? 'other'),
+            );
+          }).toList();
+          isLoading = false;
+        });
+      },
+      onError: (error) {
+        if (!mounted) return;
+        setState(() {
+          this.error = 'Failed to load expenses: ${error.toString()}';
+          isLoading = false;
+        });
+      },
+    );
+  }
+
+  Future<void> _syncBudgetsWithExpenses() async {
+    try {
+      await _budgetService.syncBudgetWithExpenses();
     } catch (e) {
-      setState(() {
-        error = 'Failed to load transactions. Please try again.';
-        isLoading = false;
-      });
+      if (mounted) {
+        _scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('Error syncing budgets: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _expensesSubscription?.cancel();
+    super.dispose();
+  }
+
+  IconData _getCategoryIcon(String category) {
+    switch (category.toLowerCase()) {
+      case 'food':
+        return Icons.restaurant;
+      case 'transport':
+        return Icons.directions_car;
+      case 'entertainment':
+        return Icons.movie;
+      case 'shopping':
+        return Icons.shopping_bag;
+      case 'bills':
+        return Icons.receipt_long;
+      default:
+        return Icons.attach_money;
+    }
+  }
+
+  Color _getCategoryColor(String category) {
+    switch (category.toLowerCase()) {
+      case 'food':
+        return Colors.red;
+      case 'transport':
+        return Colors.blue;
+      case 'entertainment':
+        return Colors.purple;
+      case 'shopping':
+        return Colors.amber;
+      case 'bills':
+        return Colors.green;
+      default:
+        return Colors.grey;
     }
   }
 
@@ -98,7 +164,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: _loadTransactions,
+                    onPressed: _setupExpensesListener,
                     child: Text('Retry'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Color(0xFF1B4242),
@@ -125,7 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
             MaterialPageRoute(
               builder: (context) => AddExpenseScreen(),
             ),
-          ).then((_) => _loadTransactions()); // Refresh list after adding
+          ).then((_) => _setupExpensesListener()); // Refresh list after adding
         },
         backgroundColor: Color(0xFF1B4242),
         child: Icon(Icons.add),
@@ -217,46 +283,208 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _deleteExpense(String expenseId, String category, double amount) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception('User not logged in');
+
+      // Delete the expense
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('expenses')
+          .doc(expenseId)
+          .delete();
+
+      // Sync budgets with expenses to ensure accurate spent amounts
+      await _syncBudgetsWithExpenses();
+
+      if (mounted) {
+        _scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('Expense deleted'),
+            action: SnackBarAction(
+              label: 'Undo',
+              onPressed: () {
+                // TODO: Implement undo functionality
+              },
+            ),
+          ),
+        );
+        _setupExpensesListener(); // Refresh the list
+      }
+    } catch (e) {
+      if (mounted) {
+        _scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('Error deleting expense: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildTransactionItem(Transaction transaction) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 4,
-            offset: Offset(0, 2),
-          ),
-        ],
+    return Dismissible(
+      key: Key(transaction.title + transaction.date.toString()),
+      background: Container(
+        color: Colors.red,
+        alignment: Alignment.centerRight,
+        padding: EdgeInsets.only(right: 20),
+        child: Icon(Icons.delete, color: Colors.white),
       ),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: transaction.color.withOpacity(0.2),
-          child: Icon(
-            transaction.icon,
-            color: transaction.color,
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (direction) async {
+        return await showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('Delete Expense'),
+              content: Text('Are you sure you want to delete this expense?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: Text('Delete'),
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                ),
+              ],
+            );
+          },
+        );
+      },
+      onDismissed: (direction) async {
+        try {
+          final user = FirebaseAuth.instance.currentUser;
+          if (user == null) throw Exception('User not logged in');
+
+          // Find the document ID for this transaction
+          final snapshot = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .collection('expenses')
+              .where('title', isEqualTo: transaction.title)
+              .where('amount', isEqualTo: transaction.amount)
+              .where('date', isEqualTo: Timestamp.fromDate(transaction.date))
+              .get();
+
+          if (snapshot.docs.isNotEmpty) {
+            await _deleteExpense(
+              snapshot.docs.first.id,
+              transaction.category,
+              transaction.amount,
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            _scaffoldMessenger.showSnackBar(
+              SnackBar(
+                content: Text('Error deleting expense: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      },
+      child: Container(
+        margin: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 1,
+              blurRadius: 4,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: transaction.color.withOpacity(0.2),
+            child: Icon(
+              transaction.icon,
+              color: transaction.color,
+            ),
           ),
-        ),
-        title: Text(
-          transaction.title,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF1B4242),
+          title: Text(
+            transaction.title,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1B4242),
+            ),
           ),
-        ),
-        subtitle: Text(
-          '${transaction.date.year}-${transaction.date.month}-${transaction.date.day}',
-          style: TextStyle(color: Colors.grey),
-        ),
-        trailing: Text(
-          '\$${transaction.amount.toStringAsFixed(2)}',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1B4242),
-            fontSize: 16,
+          subtitle: Text(
+            '${transaction.date.year}-${transaction.date.month}-${transaction.date.day}',
+            style: TextStyle(color: Colors.grey),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '\$${transaction.amount.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1B4242),
+                  fontSize: 16,
+                ),
+              ),
+              IconButton(
+                icon: Icon(Icons.more_vert, color: Color(0xFF1B4242)),
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    builder: (context) => Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ListTile(
+                          leading: Icon(Icons.delete, color: Colors.red),
+                          title: Text('Delete Expense'),
+                          onTap: () async {
+                            Navigator.pop(context);
+                            try {
+                              final user = FirebaseAuth.instance.currentUser;
+                              if (user == null) throw Exception('User not logged in');
+
+                              final snapshot = await FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(user.uid)
+                                  .collection('expenses')
+                                  .where('title', isEqualTo: transaction.title)
+                                  .where('amount', isEqualTo: transaction.amount)
+                                  .where('date', isEqualTo: Timestamp.fromDate(transaction.date))
+                                  .get();
+
+                              if (snapshot.docs.isNotEmpty) {
+                                await _deleteExpense(
+                                  snapshot.docs.first.id,
+                                  transaction.category,
+                                  transaction.amount,
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                _scaffoldMessenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error deleting expense: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
         ),
       ),
@@ -299,7 +527,7 @@ class _HomeScreenState extends State<HomeScreen> {
           case 1:
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => BudgetScreen()),
+              MaterialPageRoute(builder: (context) => BudgetsScreen()),
             );
             break;
           case 2:
