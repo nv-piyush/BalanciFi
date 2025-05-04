@@ -22,14 +22,14 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
   final List<Map<String, dynamic>> categories = [
     {
-      'name': 'Shopping',
-      'icon': Icons.shopping_bag,
-      'color': Colors.amber,
-    },
-    {
       'name': 'Food',
       'icon': Icons.restaurant,
       'color': Colors.red,
+    },
+    {
+      'name': 'Shopping',
+      'icon': Icons.shopping_bag,
+      'color': Colors.amber,
     },
     {
       'name': 'Transport',
@@ -45,6 +45,26 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       'name': 'Bills',
       'icon': Icons.receipt_long,
       'color': Colors.green,
+    },
+    {
+      'name': 'Health',
+      'icon': Icons.health_and_safety,
+      'color': Colors.pink,
+    },
+    {
+      'name': 'Education',
+      'icon': Icons.school,
+      'color': Colors.indigo,
+    },
+    {
+      'name': 'Travel',
+      'icon': Icons.flight,
+      'color': Colors.teal,
+    },
+    {
+      'name': 'Other',
+      'icon': Icons.category,
+      'color': Colors.grey,
     },
   ];
 

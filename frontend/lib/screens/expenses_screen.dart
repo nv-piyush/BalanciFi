@@ -136,18 +136,22 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     switch (category.toLowerCase()) {
       case 'food':
         return Icons.restaurant;
-      case 'transportation':
+      case 'shopping':
+        return Icons.shopping_bag;
+      case 'transport':
         return Icons.directions_car;
       case 'entertainment':
         return Icons.movie;
-      case 'shopping':
-        return Icons.shopping_bag;
-      case 'utilities':
-        return Icons.power;
+      case 'bills':
+        return Icons.receipt_long;
       case 'health':
         return Icons.health_and_safety;
+      case 'education':
+        return Icons.school;
+      case 'travel':
+        return Icons.flight;
       default:
-        return Icons.attach_money;
+        return Icons.category;
     }
   }
 }
@@ -170,11 +174,13 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
 
   final List<String> _categories = [
     'Food',
-    'Transportation',
-    'Entertainment',
     'Shopping',
-    'Utilities',
+    'Transport',
+    'Entertainment',
+    'Bills',
     'Health',
+    'Education',
+    'Travel',
     'Other'
   ];
 
