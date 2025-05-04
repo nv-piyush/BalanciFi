@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/budget_service.dart';
 
 class AddExpenseScreen extends StatefulWidget {
   @override
@@ -13,7 +13,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _amountController = TextEditingController();
-  String _selectedCategory = 'Shopping';
+  final _descriptionController = TextEditingController();
+  String _selectedCategory = 'Food';
+  DateTime _selectedDate = DateTime.now();
+  final _budgetService = BudgetService();
+  late ScaffoldMessengerState _scaffoldMessenger;
   bool _isLoading = false;
 
   final List<Map<String, dynamic>> categories = [
@@ -44,85 +48,62 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     },
   ];
 
-  Future<void> _saveExpense() async {
-    if (!_formKey.currentState!.validate()) return;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _scaffoldMessenger = ScaffoldMessenger.of(context);
+  }
 
-    setState(() => _isLoading = true);
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _amountController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
 
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        throw Exception('User not logged in');
-      }
+  Future<void> _addExpense() async {
+    if (_formKey.currentState!.validate()) {
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) throw Exception('User not logged in');
 
-      print('Current user: ${user.uid}');
-      print('User email: ${user.email}');
+        final expenseData = {
+          'title': _titleController.text,
+          'amount': double.parse(_amountController.text),
+          'category': _selectedCategory,
+          'description': _descriptionController.text,
+          'date': _selectedDate,
+          'createdAt': FieldValue.serverTimestamp(),
+        };
 
-      // Get Firestore instance
-      final firestore = FirebaseFirestore.instance;
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('expenses')
+            .add(expenseData);
 
-      // Store expense in user's expenses subcollection
-      final userExpensesRef =
-          firestore.collection('users').doc(user.uid).collection('expenses');
+        // Sync budgets with expenses to ensure accurate spent amounts
+        await _budgetService.syncBudgetWithExpenses();
 
-      // Create the expense data
-      final now = kIsWeb ? Timestamp.now() : FieldValue.serverTimestamp();
-
-      final expenseData = {
-        'title': _titleController.text,
-        'amount': double.parse(_amountController.text),
-        'category': _selectedCategory,
-        'date': now,
-        'createdAt': now,
-      };
-
-      print('About to add expense: $expenseData');
-      final docRef = await userExpensesRef.add(expenseData);
-      print('Expense added, docRef: ${docRef.id}');
-
-      // Verify the document was created
-      final docSnapshot = await docRef.get();
-      if (!docSnapshot.exists) {
-        throw Exception('Failed to create expense document');
-      }
-
-      print('Expense saved with ID: ${docRef.id}');
-      Navigator.pop(context);
-    } catch (e) {
-      print('Error in _saveExpense: $e');
-      if (e is FirebaseException) {
-        print('Firebase error code: ${e.code}');
-        print('Firebase error message: ${e.message}');
-        print('Firebase error details: ${e.toString()}');
-
-        // Handle specific Firebase errors
-        String errorMessage = 'Error saving expense';
-        if (e.code == 'permission-denied') {
-          errorMessage =
-              'Permission denied. Please check your authentication status.';
-        } else if (e.code == 'not-found') {
-          errorMessage = 'Database not found. Please contact support.';
-        } else if (e.code == 'unavailable') {
-          errorMessage = 'Service unavailable. Please try again later.';
+        if (mounted) {
+          _scaffoldMessenger.showSnackBar(
+            SnackBar(
+              content: Text('Expense added successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pop(context);
         }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving expense: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
+      } catch (e) {
+        if (mounted) {
+          _scaffoldMessenger.showSnackBar(
+            SnackBar(
+              content: Text('Error adding expense: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
@@ -247,7 +228,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         child: Padding(
           padding: EdgeInsets.all(16),
           child: ElevatedButton(
-            onPressed: _isLoading ? null : _saveExpense,
+            onPressed: _isLoading ? null : _addExpense,
             style: ElevatedButton.styleFrom(
               backgroundColor: Color(0xFF1B4242),
               padding: EdgeInsets.symmetric(vertical: 16),
@@ -275,12 +256,5 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _amountController.dispose();
-    super.dispose();
   }
 }
