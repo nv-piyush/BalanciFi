@@ -79,9 +79,11 @@ class _ExpenseTrackerScreenState extends State<ExpenseTrackerScreen> {
                       title: Text(expense['description']),
                       subtitle: Text(expense['category']),
                       trailing: Text(
-                        '${_currentCurrency} ${expense['amount'].toStringAsFixed(2)}',
-                        style: const TextStyle(
+                        '\$${expense['amount'].toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
+                          color: Color(0xFF1B4242),
                         ),
                       ),
                     );
@@ -135,9 +137,11 @@ class _ExpenseTrackerScreenState extends State<ExpenseTrackerScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Spent: $_currentCurrency ${totalSpent.toStringAsFixed(2)} / 1000',
-                      style: const TextStyle(
+                      'Spent: \$${totalSpent.toStringAsFixed(2)} / 1000',
+                      style: TextStyle(
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
+                        color: Color(0xFF1B4242),
                       ),
                     ),
                   ],

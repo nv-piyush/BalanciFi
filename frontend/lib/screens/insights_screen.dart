@@ -49,14 +49,17 @@ class _InsightsScreenState extends State<InsightsScreen> with SingleTickerProvid
     });
   }
 
-  String _getBudgetWarningMessage() {
+  String _getBudgetWarningMessage(String category) {
     final messages = [
       "Uh-oh, your budget wandered off!",
       "Your budget took a little nap this month!",
       "Your piggy bank's feeling a bit dizzy!",
       "Budget went oopsie! Next month's a reset."
     ];
-    return messages[DateTime.now().millisecondsSinceEpoch % messages.length];
+    
+    // Use the category name as part of the seed to get different messages for different categories
+    final seed = category.codeUnits.reduce((a, b) => a + b) + DateTime.now().day;
+    return messages[seed % messages.length];
   }
 
   bool _isOverBudget(String category, double amount) {
@@ -259,7 +262,7 @@ class _InsightsScreenState extends State<InsightsScreen> with SingleTickerProvid
                                           ),
                                           SizedBox(height: 4),
                                           Text(
-                                            '₹${totalExpenditure.toStringAsFixed(2)}',
+                                            '\$${totalExpenditure.toStringAsFixed(2)}',
                                             style: TextStyle(
                                               color: Color(0xFF1B4242),
                                               fontWeight: FontWeight.bold,
@@ -329,13 +332,14 @@ class _InsightsScreenState extends State<InsightsScreen> with SingleTickerProvid
                   ),
                   SizedBox(height: 8),
                   ...sortedCategories.map((entry) => _CategoryCard(
-                        name: entry.key,
-                        amount: entry.value,
-                        color: categoryColors[entry.key]!,
-                        icon: categoryIcons[entry.key] ?? Icons.category,
-                        percentage: (entry.value / totalExpenditure * 100).toStringAsFixed(1),
-                        isOverBudget: _isOverBudget(entry.key, entry.value),
-                      )),
+                    name: entry.key,
+                    amount: entry.value,
+                    color: categoryColors[entry.key]!,
+                    icon: categoryIcons[entry.key] ?? Icons.category,
+                    percentage: (entry.value / totalExpenditure * 100).toStringAsFixed(1),
+                    isOverBudget: _isOverBudget(entry.key, entry.value),
+                    warningMessage: _getBudgetWarningMessage(entry.key),
+                  )),
                   SizedBox(height: 16),
                 ],
               ),
@@ -362,6 +366,7 @@ class _CategoryCard extends StatelessWidget {
   final IconData icon;
   final String percentage;
   final bool isOverBudget;
+  final String warningMessage;
 
   const _CategoryCard({
     required this.name,
@@ -370,6 +375,7 @@ class _CategoryCard extends StatelessWidget {
     required this.icon,
     required this.percentage,
     required this.isOverBudget,
+    required this.warningMessage,
   });
 
   @override
@@ -426,7 +432,7 @@ class _CategoryCard extends StatelessWidget {
                           Padding(
                             padding: EdgeInsets.only(top: 4),
                             child: Text(
-                              "Uh-oh, your budget wandered off!",
+                              warningMessage,
                               style: TextStyle(
                                 color: Colors.red,
                                 fontSize: 12,
@@ -438,7 +444,7 @@ class _CategoryCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '₹${amount.toStringAsFixed(2)}',
+                    '\$${amount.toStringAsFixed(2)}',
                     style: TextStyle(
                       color: Color(0xFF1B4242),
                       fontWeight: FontWeight.bold,
