@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/expense_service.dart';
+import '../services/budget_service.dart';
 
 class InsightsScreen extends StatefulWidget {
   @override
@@ -10,9 +11,12 @@ class InsightsScreen extends StatefulWidget {
 
 class _InsightsScreenState extends State<InsightsScreen> with SingleTickerProviderStateMixin {
   final ExpenseService _expenseService = ExpenseService();
+  final BudgetService _budgetService = BudgetService();
   DateTime _selectedDate = DateTime.now();
   late AnimationController _animationController;
   late Animation<double> _animation;
+  Map<String, double> _budgetLimits = {};
+  Map<String, double> _budgetSpent = {};
 
   @override
   void initState() {
@@ -28,12 +32,38 @@ class _InsightsScreenState extends State<InsightsScreen> with SingleTickerProvid
       ),
     );
     _animationController.forward();
+    _loadBudgets();
   }
 
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
+  Future<void> _loadBudgets() async {
+    final budgets = await _budgetService.getBudgets();
+    setState(() {
+      _budgetLimits = {
+        for (var budget in budgets)
+          budget['category'] as String: (budget['limit'] as num).toDouble()
+      };
+      _budgetSpent = {
+        for (var budget in budgets)
+          budget['category'] as String: (budget['spent'] as num).toDouble()
+      };
+    });
+  }
+
+  String _getBudgetWarningMessage() {
+    final messages = [
+      "Uh-oh, your budget wandered off!",
+      "Your budget took a little nap this month!",
+      "Your piggy bank's feeling a bit dizzy!",
+      "Budget went oopsie! Next month's a reset."
+    ];
+    return messages[DateTime.now().millisecondsSinceEpoch % messages.length];
+  }
+
+  bool _isOverBudget(String category, double amount) {
+    final limit = _budgetLimits[category];
+    final spent = _budgetSpent[category];
+    if (limit == null || spent == null) return false;
+    return spent > limit;
   }
 
   // You can customize this mapping for icons/colors per category
@@ -304,6 +334,7 @@ class _InsightsScreenState extends State<InsightsScreen> with SingleTickerProvid
                         color: categoryColors[entry.key]!,
                         icon: categoryIcons[entry.key] ?? Icons.category,
                         percentage: (entry.value / totalExpenditure * 100).toStringAsFixed(1),
+                        isOverBudget: _isOverBudget(entry.key, entry.value),
                       )),
                   SizedBox(height: 16),
                 ],
@@ -330,6 +361,7 @@ class _CategoryCard extends StatelessWidget {
   final Color color;
   final IconData icon;
   final String percentage;
+  final bool isOverBudget;
 
   const _CategoryCard({
     required this.name,
@@ -337,6 +369,7 @@ class _CategoryCard extends StatelessWidget {
     required this.color,
     required this.icon,
     required this.percentage,
+    required this.isOverBudget,
   });
 
   @override
@@ -347,50 +380,75 @@ class _CategoryCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Padding(
-        padding: EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, color: color, size: 24),
-            ),
-            SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      child: Container(
+        decoration: BoxDecoration(
+          border: isOverBudget
+              ? Border.all(color: Colors.red.withOpacity(0.5), width: 2)
+              : null,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(icon, color: color, size: 24),
+                  ),
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: TextStyle(
+                            color: Color(0xFF1B4242),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        Text(
+                          '$percentage% of total',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 12,
+                          ),
+                        ),
+                        if (isOverBudget)
+                          Padding(
+                            padding: EdgeInsets.only(top: 4),
+                            child: Text(
+                              "Uh-oh, your budget wandered off!",
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontSize: 12,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                   Text(
-                    name,
+                    '₹${amount.toStringAsFixed(2)}',
                     style: TextStyle(
                       color: Color(0xFF1B4242),
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                     ),
                   ),
-                  Text(
-                    '$percentage% of total',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 12,
-                    ),
-                  ),
                 ],
               ),
-            ),
-            Text(
-              '₹${amount.toStringAsFixed(2)}',
-              style: TextStyle(
-                color: Color(0xFF1B4242),
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

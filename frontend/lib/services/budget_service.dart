@@ -279,4 +279,25 @@ class BudgetService {
       return alerts;
     });
   }
+
+  // Get all budgets
+  Future<List<Map<String, dynamic>>> getBudgets() async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    final budgetsSnapshot = await _firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('budgets')
+        .get();
+
+    return budgetsSnapshot.docs.map((doc) {
+      final data = doc.data();
+      return {
+        'category': data['category'] as String,
+        'limit': data['limit'] as num,
+        'spent': data['spent'] as num,
+      };
+    }).toList();
+  }
 } 
