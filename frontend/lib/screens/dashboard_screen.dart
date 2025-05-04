@@ -23,7 +23,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         index: _currentIndex,
         children: [
           HomeScreen(),
-          BudgetScreen(),
+          BudgetsScreen(),
           SavingsScreen(),
           InsightsScreen(),
           ProfileScreen(),

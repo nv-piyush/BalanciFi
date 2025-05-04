@@ -7,6 +7,7 @@ import 'savings_screen.dart';
 import 'insights_screen.dart';
 import 'profile_screen.dart';
 import 'add_expense_screen.dart';
+import '../services/budget_service.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -15,17 +16,26 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final user = FirebaseAuth.instance.currentUser;
+  final _budgetService = BudgetService();
   DateTime selectedDate = DateTime.now();
   String searchQuery = '';
   List<Transaction> transactions = [];
   bool isLoading = true;
   String? error;
   StreamSubscription<QuerySnapshot>? _expensesSubscription;
+  late ScaffoldMessengerState _scaffoldMessenger;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _scaffoldMessenger = ScaffoldMessenger.of(context);
+  }
 
   @override
   void initState() {
     super.initState();
     _setupExpensesListener();
+    _syncBudgetsWithExpenses();
   }
 
   void _setupExpensesListener() {
@@ -70,6 +80,21 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       },
     );
+  }
+
+  Future<void> _syncBudgetsWithExpenses() async {
+    try {
+      await _budgetService.syncBudgetWithExpenses();
+    } catch (e) {
+      if (mounted) {
+        _scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('Error syncing budgets: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -258,6 +283,48 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _deleteExpense(String expenseId, String category, double amount) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception('User not logged in');
+
+      // Delete the expense
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('expenses')
+          .doc(expenseId)
+          .delete();
+
+      // Sync budgets with expenses to ensure accurate spent amounts
+      await _syncBudgetsWithExpenses();
+
+      if (mounted) {
+        _scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('Expense deleted'),
+            action: SnackBarAction(
+              label: 'Undo',
+              onPressed: () {
+                // TODO: Implement undo functionality
+              },
+            ),
+          ),
+        );
+        _setupExpensesListener(); // Refresh the list
+      }
+    } catch (e) {
+      if (mounted) {
+        _scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('Error deleting expense: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildTransactionItem(Transaction transaction) {
     return Dismissible(
       key: Key(transaction.title + transaction.date.toString()),
@@ -306,25 +373,19 @@ class _HomeScreenState extends State<HomeScreen> {
               .get();
 
           if (snapshot.docs.isNotEmpty) {
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(user.uid)
-                .collection('expenses')
-                .doc(snapshot.docs.first.id)
-                .delete();
-
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Expense deleted successfully')),
-              );
-              _setupExpensesListener(); // Refresh the list
-            }
+            await _deleteExpense(
+              snapshot.docs.first.id,
+              transaction.category,
+              transaction.amount,
+            );
           }
         } catch (e) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            _scaffoldMessenger.showSnackBar(
               SnackBar(
-                  content: Text('Failed to delete expense: ${e.toString()}')),
+                content: Text('Error deleting expense: $e'),
+                backgroundColor: Colors.red,
+              ),
             );
           }
         }
@@ -388,42 +449,33 @@ class _HomeScreenState extends State<HomeScreen> {
                             Navigator.pop(context);
                             try {
                               final user = FirebaseAuth.instance.currentUser;
-                              if (user == null)
-                                throw Exception('User not logged in');
+                              if (user == null) throw Exception('User not logged in');
 
                               final snapshot = await FirebaseFirestore.instance
                                   .collection('users')
                                   .doc(user.uid)
                                   .collection('expenses')
                                   .where('title', isEqualTo: transaction.title)
-                                  .where('amount',
-                                      isEqualTo: transaction.amount)
-                                  .where('date',
-                                      isEqualTo:
-                                          Timestamp.fromDate(transaction.date))
+                                  .where('amount', isEqualTo: transaction.amount)
+                                  .where('date', isEqualTo: Timestamp.fromDate(transaction.date))
                                   .get();
 
                               if (snapshot.docs.isNotEmpty) {
-                                await FirebaseFirestore.instance
-                                    .collection('users')
-                                    .doc(user.uid)
-                                    .collection('expenses')
-                                    .doc(snapshot.docs.first.id)
-                                    .delete();
-
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                      content:
-                                          Text('Expense deleted successfully')),
+                                await _deleteExpense(
+                                  snapshot.docs.first.id,
+                                  transaction.category,
+                                  transaction.amount,
                                 );
-                                _setupExpensesListener(); // Refresh the list
                               }
                             } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                    content: Text(
-                                        'Failed to delete expense: ${e.toString()}')),
-                              );
+                              if (mounted) {
+                                _scaffoldMessenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error deleting expense: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
                             }
                           },
                         ),
@@ -475,7 +527,7 @@ class _HomeScreenState extends State<HomeScreen> {
           case 1:
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => BudgetScreen()),
+              MaterialPageRoute(builder: (context) => BudgetsScreen()),
             );
             break;
           case 2:
