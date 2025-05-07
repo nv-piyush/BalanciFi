@@ -1,0 +1,2 @@
+/Users/salonitilekar/BalanciFi/frontend/android/app/.cxx/RelWithDebInfo/5c4v5h2s/x86/CMakeFiles/edit_cache.dir
+/Users/salonitilekar/BalanciFi/frontend/android/app/.cxx/RelWithDebInfo/5c4v5h2s/x86/CMakeFiles/rebuild_cache.dir
