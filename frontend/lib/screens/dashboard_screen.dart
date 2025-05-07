@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'expenses_screen.dart';
-// import 'budgets_screen.dart';
-// import 'savings_screen.dart';
-// import 'insights_screen.dart';
-// import 'profile_screen.dart';
+import 'home_screen.dart';
+import 'budget_screen.dart';
+import 'savings_screen.dart';
+import 'insights_screen.dart';
+import 'profile_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Function(bool) onThemeChange;
@@ -15,38 +15,51 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _currentIndex = 0;
-  final List<Widget> _screens = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _screens.addAll([
-      ExpensesScreen(),
-      // BudgetsScreen(),
-      // SavingsScreen(),
-      // InsightsScreen(),
-      // ProfileScreen(onThemeChange: widget.onThemeChange),
-    ]);
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('BalanciFi Dashboard'),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [
+          HomeScreen(),
+          BudgetsScreen(),
+          SavingsScreen(),
+          InsightsScreen(),
+          ProfileScreen(),
+        ],
       ),
-      body: _screens[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: Color(0xFF1B4242),
+        unselectedItemColor: Colors.grey,
         items: [
-          BottomNavigationBarItem(icon: Icon(Icons.money), label: 'Expenses'),
-          BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label: 'Budgets'),
-          BottomNavigationBarItem(icon: Icon(Icons.savings), label: 'Savings'),
-          BottomNavigationBarItem(icon: Icon(Icons.insights), label: 'Insights'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.account_balance_wallet),
+            label: 'Expenses',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.pie_chart),
+            label: 'Budgets',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.savings),
+            label: 'Savings',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.insights),
+            label: 'Insights',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
         ],
         onTap: (int index) {
-          setState(() { _currentIndex = index; });
+          setState(() {
+            _currentIndex = index;
+          });
         },
       ),
     );
