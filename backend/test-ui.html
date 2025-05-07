@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BalanciFi API Test UI</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+      }
+      h1 {
+        color: #333;
+        text-align: center;
+      }
+      h2 {
+        color: #444;
+        margin-top: 20px;
+      }
+      form {
+        margin-bottom: 20px;
+      }
+      input,
+      button {
+        padding: 8px;
+        margin: 5px;
+        border-radius: 4px;
+        border: 1px solid #ddd;
+      }
+      button {
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #45a049;
+      }
+      .result {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        margin-top: 10px;
+        white-space: pre-wrap;
+      }
+      .error {
+        color: red;
+        margin-top: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>BalanciFi API Test UI</h1>
+
+    <!-- Authentication Section -->
+    <div class="container">
+      <h2>Authentication</h2>
+      <form id="signupForm">
+        <input type="email" id="signupEmail" placeholder="Email" required />
+        <input
+          type="password"
+          id="signupPassword"
+          placeholder="Password"
+          required
+        />
+        <input
+          type="text"
+          id="displayName"
+          placeholder="Display Name"
+          required
+        />
+        <button type="submit">Sign Up</button>
+      </form>
+      <form id="loginForm">
+        <input type="email" id="email" placeholder="Email" required />
+        <input type="password" id="password" placeholder="Password" required />
+        <button type="submit">Login</button>
+      </form>
+      <div class="result" id="loginResult"></div>
+    </div>
+
+    <!-- Location-Based Currency Update -->
+    <div class="container">
+      <h2>Update Currency by Location</h2>
+      <form id="locationForm">
+        <input
+          type="number"
+          id="latitude"
+          placeholder="Latitude"
+          step="any"
+          required
+        />
+        <input
+          type="number"
+          id="longitude"
+          placeholder="Longitude"
+          step="any"
+          required
+        />
+        <button type="submit">Update Currency</button>
+      </form>
+      <div class="result" id="locationResult"></div>
+    </div>
+
+    <!-- Currency Conversion -->
+    <div class="container">
+      <h2>Currency Conversion</h2>
+      <form id="conversionForm">
+        <input type="number" id="amount" placeholder="Amount" required />
+        <select id="fromCurrency">
+          <option value="USD">USD</option>
+          <option value="EUR">EUR</option>
+          <option value="GBP">GBP</option>
+          <option value="JPY">JPY</option>
+          <option value="AUD">AUD</option>
+        </select>
+        <select id="toCurrency">
+          <option value="EUR">EUR</option>
+          <option value="USD">USD</option>
+          <option value="GBP">GBP</option>
+          <option value="JPY">JPY</option>
+          <option value="AUD">AUD</option>
+        </select>
+        <button type="submit">Convert</button>
+      </form>
+      <div class="result" id="conversionResult"></div>
+    </div>
+
+    <!-- Get Current Currency Settings -->
+    <div class="container">
+      <h2>Get Current Currency Settings</h2>
+      <button id="getCurrencyBtn">Get Settings</button>
+      <div class="result" id="currencySettingsResult"></div>
+    </div>
+
+    <!-- Get Exchange Rates -->
+    <div class="container">
+      <h2>Get Exchange Rates</h2>
+      <form id="ratesForm">
+        <select id="baseCurrency">
+          <option value="USD">USD</option>
+          <option value="EUR">EUR</option>
+          <option value="GBP">GBP</option>
+          <option value="JPY">JPY</option>
+          <option value="AUD">AUD</option>
+        </select>
+        <button type="submit">Get Rates</button>
+      </form>
+      <div class="result" id="ratesResult"></div>
+    </div>
+
+    <script>
+      let token = "";
+      let userId = "";
+
+      // Helper function to make API calls
+      async function makeApiCall(url, method, data = null) {
+        const headers = {
+          "Content-Type": "application/json",
+        };
+
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+
+        const options = {
+          method,
+          headers,
+        };
+
+        if (data) {
+          options.body = JSON.stringify(data);
+        }
+
+        try {
+          const response = await fetch(url, options);
+          const result = await response.json();
+          return { success: true, data: result };
+        } catch (error) {
+          return { success: false, error: error.message };
+        }
+      }
+
+      // Signup
+      document
+        .getElementById("signupForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const email = document.getElementById("signupEmail").value;
+          const password = document.getElementById("signupPassword").value;
+          const displayName = document.getElementById("displayName").value;
+
+          const result = await makeApiCall(
+            "http://localhost:3000/signup",
+            "POST",
+            {
+              email,
+              password,
+              displayName,
+            }
+          );
+
+          if (result.success) {
+            document.getElementById("loginResult").textContent =
+              "Signup successful! Please login.";
+            // Clear signup form
+            document.getElementById("signupForm").reset();
+          } else {
+            document.getElementById(
+              "loginResult"
+            ).textContent = `Error: ${result.error}`;
+          }
+        });
+
+      // Login
+      document
+        .getElementById("loginForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const email = document.getElementById("email").value;
+          const password = document.getElementById("password").value;
+
+          const result = await makeApiCall(
+            "http://localhost:3000/login",
+            "POST",
+            { email, password }
+          );
+
+          if (result.success) {
+            token = result.data.token;
+            userId = result.data.uid;
+            document.getElementById("loginResult").textContent =
+              "Login successful! Token and User ID stored.";
+            // Update all API calls to use the actual userId
+            updateApiEndpoints();
+          } else {
+            document.getElementById(
+              "loginResult"
+            ).textContent = `Error: ${result.error}`;
+          }
+        });
+
+      // Function to update API endpoints with actual userId
+      function updateApiEndpoints() {
+        // Update location form
+        document
+          .getElementById("locationForm")
+          .addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const latitude = document.getElementById("latitude").value;
+            const longitude = document.getElementById("longitude").value;
+
+            const result = await makeApiCall(
+              `http://localhost:3000/users/${userId}/update-currency`,
+              "POST",
+              { latitude, longitude }
+            );
+
+            document.getElementById("locationResult").textContent =
+              JSON.stringify(result, null, 2);
+          });
+
+        // Update currency settings
+        document
+          .getElementById("getCurrencyBtn")
+          .addEventListener("click", async () => {
+            const result = await makeApiCall(
+              `http://localhost:3000/users/${userId}/currency`,
+              "GET"
+            );
+
+            document.getElementById("currencySettingsResult").textContent =
+              JSON.stringify(result, null, 2);
+          });
+      }
+
+      // Currency Conversion
+      document
+        .getElementById("conversionForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const amount = document.getElementById("amount").value;
+          const from = document.getElementById("fromCurrency").value;
+          const to = document.getElementById("toCurrency").value;
+
+          const result = await makeApiCall(
+            `http://localhost:3000/currency/convert?from=${from}&to=${to}&amount=${amount}`,
+            "GET"
+          );
+
+          document.getElementById("conversionResult").textContent =
+            JSON.stringify(result, null, 2);
+        });
+
+      // Get Exchange Rates
+      document
+        .getElementById("ratesForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const base = document.getElementById("baseCurrency").value;
+
+          const result = await makeApiCall(
+            `http://localhost:3000/currency/rates?base=${base}`,
+            "GET"
+          );
+
+          document.getElementById("ratesResult").textContent = JSON.stringify(
+            result,
+            null,
+            2
+          );
+        });
+    </script>
+  </body>
+</html>
