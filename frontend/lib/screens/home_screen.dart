@@ -8,6 +8,8 @@ import 'insights_screen.dart';
 import 'profile_screen.dart';
 import 'add_expense_screen.dart';
 import '../services/budget_service.dart';
+import '../services/expense_service.dart';
+import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -15,9 +17,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final user = FirebaseAuth.instance.currentUser;
+  final _expenseService = ExpenseService();
   final _budgetService = BudgetService();
-  DateTime selectedDate = DateTime.now();
+  late DateTime selectedDate;
   String searchQuery = '';
   List<Transaction> transactions = [];
   bool isLoading = true;
@@ -34,52 +36,52 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    selectedDate = DateTime.now();
     _setupExpensesListener();
     _syncBudgetsWithExpenses();
   }
 
   void _setupExpensesListener() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      setState(() {
-        error = 'User not logged in';
-        isLoading = false;
-      });
-      return;
+    try {
+      _expensesSubscription?.cancel();
+      _expensesSubscription = _expenseService
+          .getMonthlyExpenses(selectedDate)
+          .listen(
+        (snapshot) {
+          if (!mounted) return;
+          setState(() {
+            transactions = snapshot.docs.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              return Transaction(
+                title: data['title'] ?? '',
+                amount: (data['amount'] ?? 0.0).toDouble(),
+                date: (data['date'] as Timestamp).toDate(),
+                category: data['category'] ?? 'other',
+                icon: _getCategoryIcon(data['category'] ?? 'other'),
+                color: _getCategoryColor(data['category'] ?? 'other'),
+              );
+            }).toList();
+            isLoading = false;
+          });
+        },
+        onError: (error) {
+          print('DEBUG: Error in expenses listener: $error');
+          if (!mounted) return;
+          setState(() {
+            this.error = 'Failed to load expenses: ${error.toString()}';
+            isLoading = false;
+          });
+        },
+      );
+    } catch (e) {
+      print('DEBUG: Exception in _setupExpensesListener: $e');
+      if (mounted) {
+        setState(() {
+          error = 'Error: $e';
+          isLoading = false;
+        });
+      }
     }
-
-    _expensesSubscription = FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('expenses')
-        .orderBy('date', descending: true)
-        .snapshots()
-        .listen(
-      (snapshot) {
-        if (!mounted) return;
-        setState(() {
-          transactions = snapshot.docs.map((doc) {
-            final data = doc.data();
-            return Transaction(
-              title: data['title'] ?? '',
-              amount: (data['amount'] ?? 0.0).toDouble(),
-              date: (data['date'] as Timestamp).toDate(),
-              category: data['category'] ?? 'other',
-              icon: _getCategoryIcon(data['category'] ?? 'other'),
-              color: _getCategoryColor(data['category'] ?? 'other'),
-            );
-          }).toList();
-          isLoading = false;
-        });
-      },
-      onError: (error) {
-        if (!mounted) return;
-        setState(() {
-          this.error = 'Failed to load expenses: ${error.toString()}';
-          isLoading = false;
-        });
-      },
-    );
   }
 
   Future<void> _syncBudgetsWithExpenses() async {
@@ -237,13 +239,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   selectedDate.year,
                   selectedDate.month - 1,
                 );
+                _setupExpensesListener(); // Refresh expenses when month changes
               });
             },
             icon: Icon(Icons.chevron_left),
             label: Text(''),
           ),
           Text(
-            '${selectedDate.year}-${selectedDate.month}',
+            DateFormat('MMMM yyyy').format(selectedDate),
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -252,12 +255,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           TextButton.icon(
             onPressed: () {
-              setState(() {
-                selectedDate = DateTime(
-                  selectedDate.year,
-                  selectedDate.month + 1,
-                );
-              });
+              final now = DateTime.now();
+              final nextMonth = DateTime(selectedDate.year, selectedDate.month + 1);
+              if (nextMonth.isBefore(DateTime(now.year, now.month + 1))) {
+                setState(() {
+                  selectedDate = nextMonth;
+                  _setupExpensesListener(); // Refresh expenses when month changes
+                });
+              }
             },
             icon: Icon(Icons.chevron_right),
             label: Text(''),

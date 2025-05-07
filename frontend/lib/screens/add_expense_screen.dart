@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../services/budget_service.dart';
+import '../services/expense_service.dart';
+import 'package:intl/intl.dart';
 
 class AddExpenseScreen extends StatefulWidget {
   @override
@@ -17,6 +19,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   String _selectedCategory = 'Food';
   DateTime _selectedDate = DateTime.now();
   final _budgetService = BudgetService();
+  final _expenseService = ExpenseService();
   late ScaffoldMessengerState _scaffoldMessenger;
   bool _isLoading = false;
 
@@ -84,27 +87,21 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
   Future<void> _addExpense() async {
     if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true;
+      });
+      
       try {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user == null) throw Exception('User not logged in');
+        if (!_expenseService.isValidExpenseDate(_selectedDate)) {
+          throw Exception('Cannot add expenses with future dates');
+        }
 
-        final expenseData = {
-          'title': _titleController.text,
-          'amount': double.parse(_amountController.text),
-          'category': _selectedCategory,
-          'description': _descriptionController.text,
-          'date': _selectedDate,
-          'createdAt': FieldValue.serverTimestamp(),
-        };
-
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .collection('expenses')
-            .add(expenseData);
-
-        // Sync budgets with expenses to ensure accurate spent amounts
-        await _budgetService.syncBudgetWithExpenses();
+        await _expenseService.addExpense(
+          title: _titleController.text,
+          amount: double.parse(_amountController.text),
+          category: _selectedCategory,
+          date: _selectedDate,
+        );
 
         if (mounted) {
           _scaffoldMessenger.showSnackBar(
@@ -123,6 +120,12 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               backgroundColor: Colors.red,
             ),
           );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
         }
       }
     }
@@ -247,31 +250,53 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: EdgeInsets.all(16),
-          child: ElevatedButton(
-            onPressed: _isLoading ? null : _addExpense,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF1B4242),
-              padding: EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(Icons.calendar_today),
+                title: Text('Date'),
+                subtitle: Text(DateFormat('MMM d, yyyy').format(_selectedDate)),
+                onTap: () async {
+                  final now = DateTime.now();
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _selectedDate.isAfter(now) ? now : _selectedDate,
+                    firstDate: DateTime(now.year - 1),
+                    lastDate: now,
+                  );
+                  if (picked != null && _expenseService.isValidExpenseDate(picked)) {
+                    setState(() {
+                      _selectedDate = picked;
+                    });
+                  }
+                },
               ),
-            ),
-            child: _isLoading
-                ? SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : Text(
-                    'Save Expense',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+              SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _isLoading ? null : _addExpense,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF1B4242),
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
+                ),
+                child: _isLoading
+                    ? SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Text(
+                        'Add Expense',
+                        style: TextStyle(fontSize: 16),
+                      ),
+              ),
+            ],
           ),
         ),
       ),
