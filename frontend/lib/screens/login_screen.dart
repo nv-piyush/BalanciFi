@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/app_theme.dart';
 import 'signup_screen.dart';
 import 'dashboard_screen.dart';
+import 'package:flutter/services.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,8 +16,23 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _passwordFocusNode = FocusNode();
   bool _isLoading = false;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    // Add listener to password field for Enter key
+    _passwordFocusNode.addListener(() {
+      if (!_passwordFocusNode.hasFocus) {
+        // When focus is lost, check if it was due to Enter key
+        if (!_isLoading) {
+          _login();
+        }
+      }
+    });
+  }
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
@@ -94,6 +110,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   keyboardType: TextInputType.emailAddress,
+                  onFieldSubmitted: (_) {
+                    // Move focus to password field when Enter is pressed
+                    FocusScope.of(context).requestFocus(_passwordFocusNode);
+                  },
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your email';
@@ -107,6 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 SizedBox(height: 16),
                 TextFormField(
                   controller: _passwordController,
+                  focusNode: _passwordFocusNode,
                   obscureText: true,
                   decoration: InputDecoration(
                     labelText: 'Password',
@@ -115,6 +136,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
+                  onFieldSubmitted: (_) {
+                    if (!_isLoading) {
+                      _login();
+                    }
+                  },
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your password';
@@ -174,6 +200,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 }
