@@ -6,6 +6,7 @@ import 'dart:html' as html;
 import 'dart:async';
 import '../services/storage_service.dart';
 import 'login_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfileScreen extends StatefulWidget {
   @override
@@ -103,9 +104,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           canvas.context2D.drawImage(_videoElement!, 0, 0);
           final blob = await canvas.toBlob('image/jpeg', 0.8);
           final url = html.Url.createObjectUrlFromBlob(blob);
-          setState(() {
-            _imageUrl = url;
-          });
+          // Upload the captured photo
+          await _uploadAndSetProfilePhoto(photoUrl: url);
           _stopCamera();
           container.remove();
         });
@@ -165,17 +165,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Future<void> _uploadAndSetProfilePhoto({String? photoUrl, XFile? file}) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      final storageService = StorageService();
+      // Upload to Firebase Storage (web: photoUrl, mobile: file)
+      final downloadUrl = await storageService.uploadProfilePhotoFlexible(photoUrl: photoUrl, file: file);
+      // Update Firebase Auth profile
+      await user.updatePhotoURL(downloadUrl);
+      // Update Firestore user document
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+        'photoURL': downloadUrl,
+      });
+      setState(() {
+        _imageUrl = downloadUrl;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error uploading photo: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   Future<void> _pickImage(ImageSource source) async {
     try {
       final XFile? pickedFile = await _picker.pickImage(source: source);
       if (pickedFile != null) {
-        // For web, we'll just store the image URL temporarily
         if (kIsWeb) {
-          setState(() {
-            _imageUrl = pickedFile.path;
-          });
+          // For web, use the path as a data URL
+          await _uploadAndSetProfilePhoto(photoUrl: pickedFile.path);
+        } else {
+          await _uploadAndSetProfilePhoto(file: pickedFile);
         }
-        // TODO: Implement proper image upload to cloud storage
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
