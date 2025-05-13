@@ -6,7 +6,9 @@ import 'dart:io' as io;
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class StorageService {
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instanceFor(
+    bucket: 'balancifi-457623.firebasestorage.app',
+  );
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   Future<String> uploadProfilePhoto(String photoUrl) async {
@@ -19,7 +21,7 @@ class StorageService {
       final blob = await response.blob();
       
       // Create a reference to the file path
-      final ref = _storage.ref().child('profile_photos/${user.uid}.jpg');
+      final ref = _storage.ref().child('profile_photos/${user.uid}');
       
       // Create upload task
       final uploadTask = ref.putBlob(blob);
