@@ -1,4 +1,4 @@
-package com.example.my_assignment;
+package com.example.balancifi;
 
 import io.flutter.embedding.android.FlutterActivity;
 
