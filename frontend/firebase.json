@@ -1,1 +1,39 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"balancifi-457623","appId":"1:655962644721:android:cb993148b33f84de968950","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"balancifi-457623","configurations":{"android":"1:655962644721:android:cb993148b33f84de968950","ios":"1:655962644721:ios:cb993148b33f84de968950","macos":"1:655962644721:ios:cb993148b33f84de968950","web":"1:655962644721:web:cb993148b33f84de968950","windows":"1:655962644721:web:cb993148b33f84de968950"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "balancifi-457623",
+          "appId": "1:655962644721:android:cb993148b33f84de968950",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "balancifi-457623",
+          "configurations": {
+            "android": "1:655962644721:android:cb993148b33f84de968950",
+            "ios": "1:655962644721:ios:cb993148b33f84de968950",
+            "macos": "1:655962644721:ios:cb993148b33f84de968950",
+            "web": "1:655962644721:web:cb993148b33f84de968950",
+            "windows": "1:655962644721:web:cb993148b33f84de968950"
+          }
+        }
+      }
+    }
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}
