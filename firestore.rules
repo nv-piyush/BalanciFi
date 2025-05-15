@@ -1,8 +1,47 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=} {
-      allow read, write: if true;
-    }
-  }
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user owns the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
+
+      // Subcollections under users
+      match /{collection}/{document=**} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Expenses collection
+    match /expenses/{expenseId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Budgets collection
+    match /budgets/{budgetId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Savings collection
+    match /savings/{savingId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
 }

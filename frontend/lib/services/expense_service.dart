@@ -21,21 +21,72 @@ class ExpenseService {
     throw Exception('No user logged in');
   }
 
-  // Add new expense
+  // Get current user's expenses for a specific month
+  Stream<QuerySnapshot> getMonthlyExpenses(DateTime month) {
+    final user = _auth.currentUser;
+    if (user != null) {
+      // Calculate start and end of the month
+      final startOfMonth = DateTime(month.year, month.month, 1, 0, 0, 0);
+      final endOfMonth = DateTime(month.year, month.month + 1, 0, 23, 59, 59);
+
+      print('DEBUG: Fetching expenses for month: ${month.year}-${month.month}');
+      print('DEBUG: Start date: $startOfMonth');
+      print('DEBUG: End date: $endOfMonth');
+      print('DEBUG: User ID: ${user.uid}');
+
+      final query = _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('expenses')
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
+          .where('date', isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth))
+          .orderBy('date', descending: true);
+
+      print('DEBUG: Query path: ${query.parameters}');
+
+      return query.snapshots().map((snapshot) {
+        print('DEBUG: Got ${snapshot.docs.length} expenses');
+        snapshot.docs.forEach((doc) {
+          final data = doc.data();
+          print('DEBUG: Expense - Date: ${(data['date'] as Timestamp).toDate()}, Amount: ${data['amount']}, Title: ${data['title']}');
+        });
+        return snapshot;
+      });
+    }
+    throw Exception('No user logged in');
+  }
+
+  // Validate expense date is not in the future
+  bool isValidExpenseDate(DateTime date) {
+    final now = DateTime.now();
+    // Strip time component for comparison
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final dateToCheck = DateTime(date.year, date.month, date.day);
+    return dateToCheck.compareTo(todayStart) <= 0;
+  }
+
+  // Add new expense with date validation
   Future<void> addExpense({
+    required String title,
     required String category,
     required double amount,
-    required String description,
     DateTime? date,
   }) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('User not logged in');
 
+    final expenseDate = date ?? DateTime.now();
+    
+    // Strict date validation
+    if (!isValidExpenseDate(expenseDate)) {
+      throw Exception('Cannot add expenses with future dates');
+    }
+
     final expenseData = {
+      'title': title,
       'category': category,
       'amount': amount,
-      'description': description,
-      'date': date ?? DateTime.now(),
+      'date': Timestamp.fromDate(expenseDate),
       'createdAt': FieldValue.serverTimestamp(),
     };
 
@@ -202,5 +253,58 @@ class ExpenseService {
         await _budgetService.updateSpentAmount(newCategory, newAmount);
       }
     }
+  }
+
+  // Helper function to add test data
+  Future<void> addTestExpenses() async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    final now = DateTime.now();
+    
+    // Add expenses for current month
+    await addExpense(
+      title: 'Groceries',
+      category: 'Food',
+      amount: 150.0,
+      date: DateTime(now.year, now.month, 15),
+    );
+    
+    await addExpense(
+      title: 'Movie Night',
+      category: 'Entertainment',
+      amount: 50.0,
+      date: DateTime(now.year, now.month, 10),
+    );
+
+    // Add expenses for last month
+    await addExpense(
+      title: 'Restaurant',
+      category: 'Food',
+      amount: 80.0,
+      date: DateTime(now.year, now.month - 1, 20),
+    );
+    
+    await addExpense(
+      title: 'Shopping',
+      category: 'Shopping',
+      amount: 200.0,
+      date: DateTime(now.year, now.month - 1, 5),
+    );
+
+    // Add expenses for two months ago
+    await addExpense(
+      title: 'Utilities',
+      category: 'Bills',
+      amount: 120.0,
+      date: DateTime(now.year, now.month - 2, 25),
+    );
+    
+    await addExpense(
+      title: 'Gas',
+      category: 'Transport',
+      amount: 45.0,
+      date: DateTime(now.year, now.month - 2, 12),
+    );
   }
 }
